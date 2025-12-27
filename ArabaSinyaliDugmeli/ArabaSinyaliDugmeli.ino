@@ -1,11 +1,12 @@
  
-int l1 = 10, l2 = 11, l3 = 12, l4 = 13;   
-int r1 = 9, r2 = 8, r3 = 7, r4 = 6;      
+const int l1 = 10, l2 = 11, l3 = 12, l4 = 13;   
+const int r1 = 9, r2 = 8, r3 = 7, r4 = 6;      
 
  
 const int sagButon = 2;    // Sağ  
-const int solButon = 4;    // Sol   
 const int resetButon = 3;  // Reset 
+const int solButon = 4;    // Sol   
+
 
  
 bool solSinyalAktif = false;
@@ -134,28 +135,28 @@ void loop() {
 
 // Tüm LED'leri kapatma fonksiyonu
 void tumLEDleriKapat() {
-  digitalWrite(r1, LOW);
-  digitalWrite(r2, LOW);
-  digitalWrite(r3, LOW);
-  digitalWrite(r4, LOW);
-  digitalWrite(l1, LOW);
-  digitalWrite(l2, LOW);
-  digitalWrite(l3, LOW);
-  digitalWrite(l4, LOW);
+  digitalWrite(r1, 0);
+  digitalWrite(r2, 0);
+  digitalWrite(r3, 0);
+  digitalWrite(r4, 0);
+  digitalWrite(l1, 0);
+  digitalWrite(l2, 0);
+  digitalWrite(l3, 0);
+  digitalWrite(l4, 0);
 }
 
 // Sağ kapatma 
 void sagLEDleriKapat() {
-  digitalWrite(r1, LOW);
-  digitalWrite(r2, LOW);
-  digitalWrite(r3, LOW);
-  digitalWrite(r4, LOW);
+  digitalWrite(r1, 0);
+  digitalWrite(r2, 0);
+  digitalWrite(r3, 0);
+  digitalWrite(r4, 0);
 }
 
 // Sol kapatma 
 void solLEDleriKapat() {
-  digitalWrite(l1, LOW);
-  digitalWrite(l2, LOW);
-  digitalWrite(l3, LOW);
-  digitalWrite(l4, LOW);
+  digitalWrite(l1, 0);
+  digitalWrite(l2, 0);
+  digitalWrite(l3, 0);
+  digitalWrite(l4, 0);
 }

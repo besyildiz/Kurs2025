@@ -13,8 +13,17 @@ pinMode(l1,OUTPUT);  pinMode(l2,OUTPUT);
 }
 
 
+
 void loop()
 {
+ sagYak();
+  delay(1000);
+  
+  solYak();
+  delay(1000);
+  }
+
+void sagYak(){ 
   Serial.println("Sağ sinyal");
   
 digitalWrite(r1,1);delay(50);
@@ -26,9 +35,10 @@ digitalWrite(r1,1);delay(50);
   digitalWrite(r2,0); 
   digitalWrite(r3,0);
   digitalWrite(r4,0);
-  delay(1000);
-  
-    Serial.println("Sol sinyal");
+  }
+
+void solYak(){
+   Serial.println("Sol sinyal");
   digitalWrite(l1,1);delay(50);
   digitalWrite(l2,1);delay(50);
   digitalWrite(l3,1);delay(50);
@@ -37,6 +47,7 @@ digitalWrite(r1,1);delay(50);
   digitalWrite(l2,0); 
   digitalWrite(l3,0);
   digitalWrite(l4,0);
-  delay(1000);
-  
-}
+  }
+
+
+
