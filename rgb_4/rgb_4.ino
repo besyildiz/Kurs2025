@@ -2,7 +2,7 @@
 const int R = 9;
 const int G = 10;
 const int B = 11;
-
+// buraya açıklama satırı ekliyorum
 // ÇOK HIZLI geçiş
 int ultraHiz = 2; // 2ms = SÜPER HIZLI
 
