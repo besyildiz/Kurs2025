@@ -1,4 +1,4 @@
-// RGB LED - SÜPER HIZLI DİSK EFEKTİ
+// RGB LED - SÜPER HIZLI DİSKO EFEKTİ
 const int R = 9;
 const int G = 10;
 const int B = 11;
@@ -11,7 +11,7 @@ void setup() {
   pinMode(G, OUTPUT);
   pinMode(B, OUTPUT);
   Serial.begin(9600);
-  Serial.println("⚡ SÜPER HIZLI DİSK EFEKTİ ⚡");
+  Serial.println("⚡ SÜPER HIZLI DİSKO EFEKTİ ⚡");
 }
 
 void loop() {
