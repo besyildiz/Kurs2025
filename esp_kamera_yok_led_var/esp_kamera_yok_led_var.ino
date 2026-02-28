@@ -3,7 +3,7 @@
 #include <PubSubClient.h>
 
 // ================= WiFi =================
-const char* ssid = "i5";
+const char* ssid = "i5i";
 const char* password = "12345...";
 
 // ================= MQTT =================
