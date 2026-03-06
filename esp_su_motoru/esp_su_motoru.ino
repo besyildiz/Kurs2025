@@ -1,9 +1,9 @@
-#include <WiFi.h>
 #include <PubSubClient.h>
+#include <ESP8266WiFi.h>
 
 // WiFi Ayarları
-const char* ssid = "i6";
-const char* password = "12345678";
+const char* ssid = "i5i";
+const char* password = "12345...";
 
 // MQTT Ayarları
 const char* mqtt_server = "broker.hivemq.com";
