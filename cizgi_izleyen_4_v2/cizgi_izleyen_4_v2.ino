@@ -12,12 +12,10 @@ unsigned int sensorValues[8];
 #define IN4 9
 #define LED 13
 
-// PID VE HIZ AYARLARI
 float Kp = 0.05;    
 float Kd = 0.4;     
-int baseSpeed = 60; // Takip için yavaş hız
+int baseSpeed = 70; // Adım atarken biraz güç lazım, 70 iyidir
 int previousError = 0;
-int debugCounter = 0;
 
 void setup()
 {
@@ -33,55 +31,60 @@ void setup()
 
   delay(2000);
   digitalWrite(LED, HIGH);
-  Serial.println("--- IZLEME MODU AKTIF ---");
-  Serial.println("Kalibrasyon yapiliyor...");
-
-  for (int i = 0; i < 300; i++)
-  {
+  Serial.println("--- DENEYSEL ADIM MODU ---");
+  
+  for (int i = 0; i < 300; i++) {
     qtr.calibrate();
     delay(5);
   }
   
   digitalWrite(LED, LOW);
-  Serial.println("Kalibrasyon Bitti!");
-  Serial.println("Poz\tHata\tSol_Hiz\tSag_Hiz"); // Baslik eklendi
+  Serial.println("Kalibrasyon Bitti! Her satir bir adimdir.");
+  Serial.println("Poz\tHata\tSol_H\tSag_H");
   delay(1000);
 }
 
 void loop()
 {
+  // 1. ADIM: Sensörleri oku ve hesapla
   unsigned int position = qtr.readLineBlack(sensorValues);
-
   int error = 3500 - position;
   float P = error;
   float D = error - previousError;
   int motorSpeed = (Kp * P) + (Kd * D);
   previousError = error;
 
-  // MOTOR HIZ HESABI 
-  // Sola donmek icin (error pozitifken) Sag motor (R) hizlanmali
   int leftMotorSpeed = baseSpeed - motorSpeed;
   int rightMotorSpeed = baseSpeed + motorSpeed;
 
-  // Hız sınırları (Alt sınır motorun dönmesini sağlar)
-  leftMotorSpeed = constrain(leftMotorSpeed, 35, 100); 
-  rightMotorSpeed = constrain(rightMotorSpeed, 35, 100);
+  leftMotorSpeed = constrain(leftMotorSpeed, 0, 120); 
+  rightMotorSpeed = constrain(rightMotorSpeed, 0, 120);
 
-  // SERİ PORT ÇIKTISI (Geliştirilmiş İzleme)
-  debugCounter++;
-  if (debugCounter >= 150) { 
-    Serial.print(position);
-    Serial.print("\t");
-    Serial.print(error);
-    Serial.print("\tL: ");
-    Serial.print(leftMotorSpeed);
-    Serial.print("\tR: ");
-    Serial.println(rightMotorSpeed);
-    debugCounter = 0; 
-  }
+  // 2. ADIM: Bilgiyi ekrana yaz
+  Serial.print(position);
+  Serial.print("\t");
+  Serial.print(error);
+  Serial.print("\tL:");
+  Serial.print(leftMotorSpeed);
+  Serial.print("\tR:");
+  Serial.println(rightMotorSpeed);
 
+  // 3. ADIM: Motorları çok kısa bir süre çalıştır (Adım Atma)
   leftMotorForward(leftMotorSpeed);
   rightMotorForward(rightMotorSpeed);
+  delay(100); // 0.1 saniye boyunca hareket et
+
+  // 4. ADIM: Motorları durdur ve bekle
+  motorsStop();
+  delay(1000); // 1 saniye bekle (Senin okuman ve gözlemlemen için)
+}
+
+// YENİ FONKSİYON: Motorları Durdurma
+void motorsStop() {
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+  digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
 }
 
 void leftMotorForward(int speedValue) {
