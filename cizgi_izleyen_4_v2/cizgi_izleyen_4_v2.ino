@@ -3,94 +3,114 @@
 QTRSensors qtr;
 unsigned int sensorValues[8];
 
-// MOTOR PİNLERİ
 #define ENA 5
 #define IN1 7
 #define IN2 6
 #define ENB 3
 #define IN3 8
 #define IN4 9
-#define LED 13
+
+// --- ADIM AYARLARI ---
+int stepDuration = 80;  // Adımı daha iyi hissetmek için 80ms yaptım
+int stepWait = 1500;    
+int baseSpeed = 110;    
+// ---------------------
 
 float Kp = 0.05;    
-float Kd = 0.4;     
-int baseSpeed = 70; // Adım atarken biraz güç lazım, 70 iyidir
 int previousError = 0;
 
-void setup()
-{
+void setup() {
   Serial.begin(9600); 
-
   qtr.setTypeAnalog();
   qtr.setSensorPins((const byte[]){A0, A1, A2, A3, A4, A5, A6, A7}, 8);
 
   pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
   pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
-  pinMode(LED, OUTPUT);
 
-  delay(2000);
-  digitalWrite(LED, HIGH);
-  Serial.println("--- DENEYSEL ADIM MODU ---");
-  
+  Serial.println("KALIBRASYON YAPILIYOR...");
   for (int i = 0; i < 300; i++) {
     qtr.calibrate();
     delay(5);
   }
-  
-  digitalWrite(LED, LOW);
-  Serial.println("Kalibrasyon Bitti! Her satir bir adimdir.");
-  Serial.println("Poz\tHata\tSol_H\tSag_H");
-  delay(1000);
+  Serial.println("Poz\tL_Guc\tR_Guc\tDurum");
 }
 
-void loop()
-{
-  // 1. ADIM: Sensörleri oku ve hesapla
+void loop() {
   unsigned int position = qtr.readLineBlack(sensorValues);
+  
+  bool cizgiVarMi = false;
+  for (int i = 0; i < 8; i++) {
+    if (sensorValues[i] > 400) { 
+      cizgiVarMi = true;
+      break;
+    }
+  }
+
   int error = 3500 - position;
   float P = error;
   float D = error - previousError;
-  int motorSpeed = (Kp * P) + (Kd * D);
+  int motorSpeed = (Kp * P) + (0.3 * D);
   previousError = error;
 
-  int leftMotorSpeed = baseSpeed - motorSpeed;
-  int rightMotorSpeed = baseSpeed + motorSpeed;
+  int leftMotorSpeed = 0;
+  int rightMotorSpeed = 0;
+  String durum = "";
 
-  leftMotorSpeed = constrain(leftMotorSpeed, 0, 120); 
-  rightMotorSpeed = constrain(rightMotorSpeed, 0, 120);
+  if (!cizgiVarMi) {
+    durum = "CIZGI YOK";
+    leftMotorSpeed = 0;
+    rightMotorSpeed = 0;
+  } 
+  else if (position >= 2000 && position <= 5000) {
+    durum = "MERKEZDE";
+    leftMotorSpeed = baseSpeed - motorSpeed;
+    rightMotorSpeed = baseSpeed + motorSpeed;
+    leftMotorSpeed = constrain(leftMotorSpeed, 75, 160); 
+    rightMotorSpeed = constrain(rightMotorSpeed, 75, 160);
+  } 
+  else if (position < 2000) {
+    durum = "SOL KENAR";
+    leftMotorSpeed = 0;    // Sol dursun
+    rightMotorSpeed = 150; // Sağ dönsün
+  } 
+  else {
+    durum = "SAG KENAR";
+    leftMotorSpeed = 150;  // Sol dönsün
+    rightMotorSpeed = 0;   // Sağ dursun
+  }
 
-  // 2. ADIM: Bilgiyi ekrana yaz
-  Serial.print(position);
-  Serial.print("\t");
-  Serial.print(error);
-  Serial.print("\tL:");
-  Serial.print(leftMotorSpeed);
-  Serial.print("\tR:");
-  Serial.println(rightMotorSpeed);
+  // Seri Monitör Çıktısı
+  Serial.print(position); Serial.print("\t");
+  Serial.print(leftMotorSpeed); Serial.print("\t");
+  Serial.print(rightMotorSpeed); Serial.print("\t");
+  Serial.println(durum);
 
-  // 3. ADIM: Motorları çok kısa bir süre çalıştır (Adım Atma)
-  leftMotorForward(leftMotorSpeed);
-  rightMotorForward(rightMotorSpeed);
-  delay(100); // 0.1 saniye boyunca hareket et
+  // --- HAREKET KOMUTLARI (DÜZELTİLDİ) ---
+  if (cizgiVarMi) {
+    // Sol Motor Kontrolü
+    if (leftMotorSpeed > 0) {
+      digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW); analogWrite(ENA, leftMotorSpeed);
+    } else {
+      digitalWrite(IN1, LOW); digitalWrite(IN2, LOW); analogWrite(ENA, 0);
+    }
 
-  // 4. ADIM: Motorları durdur ve bekle
-  motorsStop();
-  delay(1000); // 1 saniye bekle (Senin okuman ve gözlemlemen için)
+    // Sağ Motor Kontrolü
+    if (rightMotorSpeed > 0) {
+      digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW); analogWrite(ENB, rightMotorSpeed);
+    } else {
+      digitalWrite(IN3, LOW); digitalWrite(IN4, LOW); analogWrite(ENB, 0);
+    }
+    
+    delay(stepDuration); 
+  }
+  
+  motorsStop(); // Adım bittiğinde her ikisini de kapat
+  delay(stepWait); 
 }
 
-// YENİ FONKSİYON: Motorları Durdurma
 void motorsStop() {
-  analogWrite(ENA, 0);
-  analogWrite(ENB, 0);
+  analogWrite(ENA, 0); analogWrite(ENB, 0);
   digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
   digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
-}
-
-void leftMotorForward(int speedValue) {
-  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW); analogWrite(ENA, speedValue);
-}
-
-void rightMotorForward(int speedValue) {
-  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW); analogWrite(ENB, speedValue);
 }
