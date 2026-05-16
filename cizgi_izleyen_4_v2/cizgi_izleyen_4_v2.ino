@@ -3,6 +3,7 @@
 QTRSensors qtr;
 unsigned int sensorValues[8];
 
+// Motor Pin Tanımlamaları
 #define ENA 5
 #define IN1 7
 #define IN2 6
@@ -10,118 +11,149 @@ unsigned int sensorValues[8];
 #define IN3 8
 #define IN4 9
 
-// --- ADIM AYARLARI ---
+// --- ADIM VE GÖZLEM AYARLARI ---
 int stepDuration = 80;  
-int stepWait = 1500;    
-int baseSpeed = 110;    
+int stepWait = 2000;    // 2 saniye bekleme (Durumu rahat oku diye)
+int baseSpeed = 115;    
 
-float Kp = 0.05;    
+float Kp = 0.12;        
 int previousError = 0;
+
+// --- SENSÖR EŞİK DEĞERİ ---
+// Kalibrasyon bittikten sonra burayı monitördeki verilere göre güncelleyebiliriz.
+int beyazEsik = 530; 
 
 void setup() {
   Serial.begin(9600); 
   qtr.setTypeAnalog();
-  qtr.setSensorPins((const byte[]){A0, A1, A2, A3, A4, A5, A6, A7}, 8);
+  // Pin sırasını senin donanımına göre ters bıraktık
+  qtr.setSensorPins((const byte[]){A7, A6, A5, A4, A3, A2, A1, A0}, 8);
 
   pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
   pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
 
   Serial.println("--- KALIBRASYON BASLADI ---");
+  Serial.println("Sensorleri beyaz cizgi uzerinde saga sola GENISCE gezdirin...");
+  delay(1000);
+  
   for (int i = 0; i < 200; i++) {
     qtr.calibrate();
+    
+    // --- YENİ: KALİBRASYON VERİLERİNİ CANLI İZLEME ---
     if (i % 20 == 0) {
-      qtr.read(sensorValues);
-      Serial.print("Kalibrasyon... S4 Degeri: "); Serial.println(sensorValues[3]);
+      qtr.read(sensorValues); // O andaki anlık değerleri oku
+      Serial.print("Kalibrasyon Adimi "); Serial.print(i); Serial.print("/200 -> ");
+      // Sadece 0. (Sol) ve 7. (Sağ) ve 4. (Orta) sensörleri yazdıralım ki ekran dolmasın
+      Serial.print("S Sol(A7): "); Serial.print(sensorValues[0]);
+      Serial.print("\tS Orta(A4): "); Serial.print(sensorValues[4]);
+      Serial.print("\tS Sag(A0): "); Serial.println(sensorValues[7]);
     }
     delay(10);
   }
-  Serial.println("--- HAZIR ---\nPoz\tL_Guc\tR_Guc\tKonum Durumu");
-  delay(1000);
+  
+  Serial.println("--- KALIBRASYON BITTI! SISTEM HAZIR ---");
+  delay(1500);
 }
 
 void loop() {
-  unsigned int position = qtr.readLineBlack(sensorValues);
+  // 1. Sensörleri Oku
+  qtr.read(sensorValues);
+  unsigned int position = qtr.readLineWhite(sensorValues);
   
+  // 2. Çizgi Kilit Mekanizması (Gürültü Engelleme)
   bool cizgiVarMi = false;
+  int enDusukOkuma = 1023;
+
   for (int i = 0; i < 8; i++) {
-    if (sensorValues[i] > 400) { 
-      cizgiVarMi = true;
-      break;
+    if (sensorValues[i] < enDusukOkuma) {
+      enDusukOkuma = sensorValues[i];
     }
   }
 
- // --- HESAPLAMA VE DAVRANIS IYILESDIRME ---
+  // En parlak sensörümüz eşikten küçükse çizgi var kabul et
+  if (enDusukOkuma < beyazEsik) {
+    cizgiVarMi = true;
+  }
+
+  // 3. PID Hesaplama
   int error = 3500 - position;
-  float P = error;
-  float D = error - previousError;
-  
-  // Kp değerini 0.05'ten 0.07'ye çekerek tepkiyi biraz sertleştirdim (Merkeze daha istekli gelir)
-  int motorSpeed = (0.07 * P) + (0.3 * D); 
+  int motorSpeed = (Kp * error) + (0.3 * (error - previousError));
   previousError = error;
 
   int leftMotorSpeed = 0;
   int rightMotorSpeed = 0;
   String durum = "";
 
+  // 4. Konum Durumunu Belirleme
   if (!cizgiVarMi) {
-    durum = "CIZGI YOK";
-    leftMotorSpeed = 0; rightMotorSpeed = 0;
+    durum = "CIZGI YOK (Siyah Zemin)";
+    leftMotorSpeed = 0;
+    rightMotorSpeed = 0;
   } 
-  else if (position < 1000) {
+  else if (position < 1200) {
     durum = "EN SOLDA";
-    leftMotorSpeed = 150; rightMotorSpeed =  0; 
+    leftMotorSpeed = 0;    
+    rightMotorSpeed = 170; 
   }
-  else if (position >= 1000 && position < 3000) {
+  else if (position >= 1200 && position < 3300) {
     durum = "MERKEZ SOL";
-    // MERKEZ SOLDA: Sag motorun (right) daha baskın olması lazım
-    // Isaretleri senin motor yonune gore guncelledim:
     leftMotorSpeed = baseSpeed - motorSpeed; 
     rightMotorSpeed = baseSpeed + motorSpeed;
   }
-  else if (position >= 3000 && position <= 4000) {
+  else if (position >= 3300 && position <= 3700) {
     durum = "TAM MERKEZ";
-    leftMotorSpeed = baseSpeed - motorSpeed;
-    rightMotorSpeed = baseSpeed + motorSpeed;
+    leftMotorSpeed = baseSpeed; 
+    rightMotorSpeed = baseSpeed;
   }
-  else if (position > 4000 && position <= 6000) {
+  else if (position > 3700 && position <= 5800) {
     durum = "MERKEZ SAG";
-    // MERKEZ SAGDA: Sol motorun (left) daha baskın olması lazım
     leftMotorSpeed = baseSpeed - motorSpeed; 
     rightMotorSpeed = baseSpeed + motorSpeed;
   }
   else {
     durum = "EN SAGDA";
-    leftMotorSpeed = 0; rightMotorSpeed = 150;
+    leftMotorSpeed = 170;  
+    rightMotorSpeed = 0;    
   }
-  // Hız kısıtlamaları (Sadece çizgi varken ve merkez bölgelerindeyse uygula)
+
+  // Hız Sınırlandırma
   if (cizgiVarMi && durum.startsWith("MERKEZ")) {
-    leftMotorSpeed = constrain(leftMotorSpeed, 75, 160); 
-    rightMotorSpeed = constrain(rightMotorSpeed, 75, 160);
+    leftMotorSpeed = constrain(leftMotorSpeed, 60, 190); 
+    rightMotorSpeed = constrain(rightMotorSpeed, 60, 190);
   }
 
-  // Seri Monitör Çıktısı
-  Serial.print(position); Serial.print("\t");
-  Serial.print(leftMotorSpeed); Serial.print("\t");
-  Serial.print(rightMotorSpeed); Serial.print("\t");
-  Serial.println(durum);
+  // 5. Seri Monitöre Yazdır
+  Serial.print("Poz: "); Serial.print(position);
+  Serial.print("\tEnDusuk: "); Serial.print(enDusukOkuma);
+  Serial.print("\tL: "); Serial.print(leftMotorSpeed);
+  Serial.print("\tR: "); Serial.print(rightMotorSpeed);
+  Serial.print("\tDurum: "); Serial.println(durum);
 
-  // --- HAREKET UYGULAMA ---
+  // 6. Hareketi Uygula
   if (cizgiVarMi) {
-    if (leftMotorSpeed > 0) {
-      digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW); analogWrite(ENA, leftMotorSpeed);
+    // Sol Motor
+    if (leftMotorSpeed > 20) {
+      digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+      analogWrite(ENA, leftMotorSpeed);
     } else {
-      digitalWrite(IN1, LOW); digitalWrite(IN2, LOW); analogWrite(ENA, 0);
+      digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+      analogWrite(ENA, 0);
     }
 
-    if (rightMotorSpeed > 0) {
-      digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW); analogWrite(ENB, rightMotorSpeed);
+    // Sağ Motor
+    if (rightMotorSpeed > 20) {
+      digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+      analogWrite(ENB, rightMotorSpeed);
     } else {
-      digitalWrite(IN3, LOW); digitalWrite(IN4, LOW); analogWrite(ENB, 0);
+      digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+      analogWrite(ENB, 0);
     }
+    
     delay(stepDuration); 
   }
   
+  // 7. Motorları Durdur ve Bekle
   motorsStop(); 
   delay(stepWait); 
 }
