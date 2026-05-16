@@ -12,11 +12,11 @@ unsigned int sensorValues[8];
 #define IN3 7  // Sağ motor yön pinleri
 #define IN4 6  
 
-// --- SÜPER YAVAŞ VE GÜVENLİ SÜRÜŞ PARAMETRELERİ ---
-int baseSpeed = 20;    // Çok sakin, masa üstü için ideal güvenli temel hız 105
-float Kp = 0.12;        // Yavaş sürüşe uygun, yumuşak dönüş tepkisi 0.12
-float Kd = 0.35;        // Titremeyi önleyen sönümleme gücü 0.35
-int previousError = 0; 
+// --- ULTRA DİKKATLİ VE SIK VERİ KONTROL AYARLARI ---
+int baseSpeed = 85;     // Temel hızı daha da düşürdük (Motorların bayılmayacağı en alt sınır)
+float Kp = 0.22;        // Virajı kaçırmasın diye tepki sertliğini artırdık (Çok kritik!)
+float Kd = 0.50;        // Ani tepkide masada savrulmayı önleyen sert fren gücü
+int previousError = 0;
 
 // --- SENSÖR EŞİK DEĞERİ ---
 int beyazEsik = 530; 
@@ -30,7 +30,7 @@ void setup() {
   pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
   pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
 
-  Serial.println("--- SÜPER YAVAŞ MOD: KALIBRASYON BASLADI ---");
+  Serial.println("--- ULTRA DIKKATLI MOD BASLADI ---");
   Serial.println("Sensorleri beyaz cizgi uzerinde saga sola GENISCE gezdirin...");
   
   for (int i = 0; i < 200; i++) {
@@ -38,12 +38,12 @@ void setup() {
     delay(10);
   }
   
-  Serial.println("--- SÜPER GÜVENLİ SÜRÜŞ BAŞLADI ---");
+  Serial.println("--- SENSORLER HAZIR (KESINTISIZ GOZLEM) ---");
   delay(1000);
 }
 
 void loop() {
-  // 1. Sensörleri Oku
+  // 1. Kesintisiz Sensör Oku (Gecikme sıfıra indirildi)
   qtr.read(sensorValues);
   unsigned int position = qtr.readLineWhite(sensorValues);
   
@@ -61,7 +61,7 @@ void loop() {
     cizgiVarMi = true;
   }
 
-  // 3. PID Hesaplama
+  // 3. PID Hesaplama (Yüksek hassasiyetli katsayılar)
   int error = 3500 - position;
   int motorSpeed = (Kp * error) + (Kd * (error - previousError));
   previousError = error;
@@ -70,20 +70,19 @@ void loop() {
   int rightMotorSpeed = 0;
   String durum = "";
 
-  // 4. Yavaşlatılmış Sürüş ve Dönüş Kararları
+  // 4. Hızlı Karar - Yavaş Uygulama Mekanizması
   if (!cizgiVarMi) {
-    durum = "GERI GELEREK CIZGI ARANIYOR";
-    // Masadan düşme riskine karşı geri aramayı çok yavaş (70 hızında) yapıyoruz
+    durum = "CIZGI YOK - ANINDA GERI ARA";
+    // DELAY YOK! Çizgi bittiği salise motorlar anında geri vitese geçer.
     digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
     digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
-    analogWrite(ENA, 70);    analogWrite(ENB, 70);
-    delay(50); // Çok kısa bir an geri gel
-    return;
+    analogWrite(ENA, 75);    analogWrite(ENB, 75);
+    return; 
   } 
   else if (position < 1000) {
     durum = "EN SOLDA";
     leftMotorSpeed = 0;    
-    rightMotorSpeed = 135; // Keskin dönüş hızı da tamamen yavaşlatıldı
+    rightMotorSpeed = 130; // Virajı yakaladığı an içeri fırlatacak güvenli güç
   }
   else if (position >= 1000 && position < 3300) {
     durum = "MERKEZ SOL";
@@ -102,17 +101,17 @@ void loop() {
   }
   else { // position > 6000
     durum = "EN SAGDA";
-    leftMotorSpeed = 135;  // Keskin dönüş hızı tamamen yavaşlatıldı
+    leftMotorSpeed = 130;  
     rightMotorSpeed = 0;    
   }
 
-  // 5. Hız Sınırlandırma (Masa koruması için üst sınırı 150'ye çektik)
+  // 5. Hız Sınırlandırma (Düşük hız bariyeri)
   if (durum.startsWith("MERKEZ")) {
-    leftMotorSpeed = constrain(leftMotorSpeed, 40, 150); 
-    rightMotorSpeed = constrain(rightMotorSpeed, 40, 150);
+    leftMotorSpeed = constrain(leftMotorSpeed, 35, 130); 
+    rightMotorSpeed = constrain(rightMotorSpeed, 35, 130);
   }
 
-  // 6. Motorları Çalıştır
+  // 6. Motor Komutları
   if (leftMotorSpeed > 20) {
     digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
     analogWrite(ENA, leftMotorSpeed);
@@ -129,6 +128,7 @@ void loop() {
     analogWrite(ENB, 0);
   }
 
-  // Robotun hızını yapay olarak dizginleyen ana mola (50ms)
-  delay(50); 
+  // Büyük delay() kaldırıldı. Sadece işlemcinin nefes alması için 1 milisaniye mola.
+  // Araba saniyede binlerce kez durum kontrolü yapacak.
+  delay(1); 
 }
