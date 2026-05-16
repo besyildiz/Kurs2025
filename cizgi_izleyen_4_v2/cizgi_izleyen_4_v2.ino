@@ -3,57 +3,43 @@
 QTRSensors qtr;
 unsigned int sensorValues[8];
 
-// Motor Pin Tanımlamaları
-#define ENA 5
-#define IN1 7
-#define IN2 6
-#define ENB 3
-#define IN3 8
-#define IN4 9
+// --- MOTOR PIN TANIMLAMALARI ---
+#define ENA 3  // Sol motor hız pini
+#define IN1 8  // Sol motor yön pinleri
+#define IN2 9  
 
-// --- ADIM VE GÖZLEM AYARLARI ---
-int stepDuration = 80;  
-int stepWait = 2000;    // 2 saniye bekleme (Durumu rahat oku diye)
-int baseSpeed = 115;    
+#define ENB 5  // Sağ motor hız pini
+#define IN3 7  // Sağ motor yön pinleri
+#define IN4 6  
 
-float Kp = 0.12;        
-int previousError = 0;
+// --- SÜPER YAVAŞ VE GÜVENLİ SÜRÜŞ PARAMETRELERİ ---
+int baseSpeed = 20;    // Çok sakin, masa üstü için ideal güvenli temel hız 105
+float Kp = 0.12;        // Yavaş sürüşe uygun, yumuşak dönüş tepkisi 0.12
+float Kd = 0.35;        // Titremeyi önleyen sönümleme gücü 0.35
+int previousError = 0; 
 
 // --- SENSÖR EŞİK DEĞERİ ---
-// Kalibrasyon bittikten sonra burayı monitördeki verilere göre güncelleyebiliriz.
 int beyazEsik = 530; 
 
 void setup() {
   Serial.begin(9600); 
   qtr.setTypeAnalog();
-  // Pin sırasını senin donanımına göre ters bıraktık
   qtr.setSensorPins((const byte[]){A7, A6, A5, A4, A3, A2, A1, A0}, 8);
 
   pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
   pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
 
-  Serial.println("--- KALIBRASYON BASLADI ---");
+  Serial.println("--- SÜPER YAVAŞ MOD: KALIBRASYON BASLADI ---");
   Serial.println("Sensorleri beyaz cizgi uzerinde saga sola GENISCE gezdirin...");
-  delay(1000);
   
   for (int i = 0; i < 200; i++) {
     qtr.calibrate();
-    
-    // --- YENİ: KALİBRASYON VERİLERİNİ CANLI İZLEME ---
-    if (i % 20 == 0) {
-      qtr.read(sensorValues); // O andaki anlık değerleri oku
-      Serial.print("Kalibrasyon Adimi "); Serial.print(i); Serial.print("/200 -> ");
-      // Sadece 0. (Sol) ve 7. (Sağ) ve 4. (Orta) sensörleri yazdıralım ki ekran dolmasın
-      Serial.print("S Sol(A7): "); Serial.print(sensorValues[0]);
-      Serial.print("\tS Orta(A4): "); Serial.print(sensorValues[4]);
-      Serial.print("\tS Sag(A0): "); Serial.println(sensorValues[7]);
-    }
     delay(10);
   }
   
-  Serial.println("--- KALIBRASYON BITTI! SISTEM HAZIR ---");
-  delay(1500);
+  Serial.println("--- SÜPER GÜVENLİ SÜRÜŞ BAŞLADI ---");
+  delay(1000);
 }
 
 void loop() {
@@ -61,7 +47,7 @@ void loop() {
   qtr.read(sensorValues);
   unsigned int position = qtr.readLineWhite(sensorValues);
   
-  // 2. Çizgi Kilit Mekanizması (Gürültü Engelleme)
+  // 2. Çizgi Kontrolü
   bool cizgiVarMi = false;
   int enDusukOkuma = 1023;
 
@@ -71,32 +57,35 @@ void loop() {
     }
   }
 
-  // En parlak sensörümüz eşikten küçükse çizgi var kabul et
   if (enDusukOkuma < beyazEsik) {
     cizgiVarMi = true;
   }
 
   // 3. PID Hesaplama
   int error = 3500 - position;
-  int motorSpeed = (Kp * error) + (0.3 * (error - previousError));
+  int motorSpeed = (Kp * error) + (Kd * (error - previousError));
   previousError = error;
 
   int leftMotorSpeed = 0;
   int rightMotorSpeed = 0;
   String durum = "";
 
-  // 4. Konum Durumunu Belirleme
+  // 4. Yavaşlatılmış Sürüş ve Dönüş Kararları
   if (!cizgiVarMi) {
-    durum = "CIZGI YOK (Siyah Zemin)";
-    leftMotorSpeed = 0;
-    rightMotorSpeed = 0;
+    durum = "GERI GELEREK CIZGI ARANIYOR";
+    // Masadan düşme riskine karşı geri aramayı çok yavaş (70 hızında) yapıyoruz
+    digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
+    digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
+    analogWrite(ENA, 70);    analogWrite(ENB, 70);
+    delay(50); // Çok kısa bir an geri gel
+    return;
   } 
-  else if (position < 1200) {
+  else if (position < 1000) {
     durum = "EN SOLDA";
     leftMotorSpeed = 0;    
-    rightMotorSpeed = 170; 
+    rightMotorSpeed = 135; // Keskin dönüş hızı da tamamen yavaşlatıldı
   }
-  else if (position >= 1200 && position < 3300) {
+  else if (position >= 1000 && position < 3300) {
     durum = "MERKEZ SOL";
     leftMotorSpeed = baseSpeed - motorSpeed; 
     rightMotorSpeed = baseSpeed + motorSpeed;
@@ -106,60 +95,40 @@ void loop() {
     leftMotorSpeed = baseSpeed; 
     rightMotorSpeed = baseSpeed;
   }
-  else if (position > 3700 && position <= 5800) {
+  else if (position > 3700 && position <= 6000) {
     durum = "MERKEZ SAG";
     leftMotorSpeed = baseSpeed - motorSpeed; 
     rightMotorSpeed = baseSpeed + motorSpeed;
   }
-  else {
+  else { // position > 6000
     durum = "EN SAGDA";
-    leftMotorSpeed = 170;  
+    leftMotorSpeed = 135;  // Keskin dönüş hızı tamamen yavaşlatıldı
     rightMotorSpeed = 0;    
   }
 
-  // Hız Sınırlandırma
-  if (cizgiVarMi && durum.startsWith("MERKEZ")) {
-    leftMotorSpeed = constrain(leftMotorSpeed, 60, 190); 
-    rightMotorSpeed = constrain(rightMotorSpeed, 60, 190);
+  // 5. Hız Sınırlandırma (Masa koruması için üst sınırı 150'ye çektik)
+  if (durum.startsWith("MERKEZ")) {
+    leftMotorSpeed = constrain(leftMotorSpeed, 40, 150); 
+    rightMotorSpeed = constrain(rightMotorSpeed, 40, 150);
   }
 
-  // 5. Seri Monitöre Yazdır
-  Serial.print("Poz: "); Serial.print(position);
-  Serial.print("\tEnDusuk: "); Serial.print(enDusukOkuma);
-  Serial.print("\tL: "); Serial.print(leftMotorSpeed);
-  Serial.print("\tR: "); Serial.print(rightMotorSpeed);
-  Serial.print("\tDurum: "); Serial.println(durum);
-
-  // 6. Hareketi Uygula
-  if (cizgiVarMi) {
-    // Sol Motor
-    if (leftMotorSpeed > 20) {
-      digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
-      analogWrite(ENA, leftMotorSpeed);
-    } else {
-      digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
-      analogWrite(ENA, 0);
-    }
-
-    // Sağ Motor
-    if (rightMotorSpeed > 20) {
-      digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
-      analogWrite(ENB, rightMotorSpeed);
-    } else {
-      digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
-      analogWrite(ENB, 0);
-    }
-    
-    delay(stepDuration); 
+  // 6. Motorları Çalıştır
+  if (leftMotorSpeed > 20) {
+    digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+    analogWrite(ENA, leftMotorSpeed);
+  } else {
+    digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+    analogWrite(ENA, 0);
   }
-  
-  // 7. Motorları Durdur ve Bekle
-  motorsStop(); 
-  delay(stepWait); 
-}
 
-void motorsStop() {
-  analogWrite(ENA, 0); analogWrite(ENB, 0);
-  digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
-  digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+  if (rightMotorSpeed > 20) {
+    digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+    analogWrite(ENB, rightMotorSpeed);
+  } else {
+    digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+    analogWrite(ENB, 0);
+  }
+
+  // Robotun hızını yapay olarak dizginleyen ana mola (50ms)
+  delay(50); 
 }
