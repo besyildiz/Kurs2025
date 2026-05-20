@@ -1,0 +1,117 @@
+
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+    <title>TOSYA-IOT Toprak Nem Takip</title>
+    <!-- Tarayıcıda MQTT protokolünü kullanabilmek için CDN kütüphanesi -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .iot-card {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            width: 320px;
+            text-align: center;
+            border-top: 5px solid #2ecc71;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            font-size: 24px;
+        }
+        hr {
+            border: 0;
+            height: 1px;
+            background: #e0e0e0;
+            margin: 20px 0;
+        }
+        .data-container {
+            font-size: 40px;
+            font-weight: bold;
+            color: #27ae60;
+            margin: 20px 0;
+        }
+        .status-text {
+            font-size: 14px;
+            font-weight: 500;
+            color: #e67e22;
+            transition: color 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <form id="form1" runat="server">
+        <div class="iot-card">
+            <h2>TOSYA-IOT Canlı Veri</h2>
+            <p style="color: #7f8c8d; margin: 0; font-size: 14px;">Akıllı Saksi Nem Durumu</p>
+            <hr />
+            
+            <!-- Canlı Nem Verisi Buraya Yazılacak -->
+            <div class="data-container">
+                %<span id="web_toprak_nem">--</span>
+            </div>
+            
+            <hr />
+            <!-- Canlı Bağlantı Durumu -->
+            <div id="baglanti_durumu" class="status-text">Bulut sunucusuna bağlanılıyor...</div>
+        </div>
+    </form>
+
+    <script>
+        // Tarayıcılar güvenli WebSocket (wss) üzerinden 8884 portunu kullanarak HiveMQ'ya bağlanır
+        const broker = 'wss://broker.hivemq.com:8884/mqtt'; 
+        const client = mqtt.connect(broker);
+
+        const durumElementi = document.getElementById('baglanti_durumu');
+        const nemElementi = document.getElementById('web_toprak_nem');
+
+        // Broker bağlantısı başarılı olduğunda çalışır
+        client.on('connect', function () {
+            durumElementi.innerText = 'Canlı Veri Bağlantısı Aktif';
+            durumElementi.style.color = 'green';
+            
+            // ESP8266'nın ilk başta hazırladığımız MQTT konusuna (topic) abone oluyoruz
+            client.subscribe('burak37/toprak_nem');
+        });
+
+        // Yeni veri geldiğinde çalışır
+        client.on('message', function (topic, message) {
+            const veri = message.toString();
+
+            if (topic === 'burak37/toprak_nem') {
+                // Gelen veriyi tam sayı formatında ekrana basıyoruz
+                nemElementi.innerText = parseInt(veri);
+                
+                // Küçük bir görsel zeka ekleyelim: Nem durumuna göre kartın rengiyle oynayabiliriz
+                const nemDegeri = parseInt(veri);
+                if(nemDegeri < 30) {
+                    nemElementi.style.color = '#e74c3c'; // Çok kuruysa Kırmızı
+                } else if(nemDegeri < 70) {
+                    nemElementi.style.color = '#27ae60'; // İdealse Yeşil
+                } else {
+                    nemElementi.style.color = '#2980b9'; // Çok ıslaksa Mavi
+                }
+            }
+        });
+
+        // Bağlantı hatası durumunda çalışır
+        client.on('error', function (err) {
+            durumElementi.innerText = 'Bağlantı Hatası!';
+            durumElementi.style.color = 'red';
+            console.error(err);
+        });
+    </script>
+</body>
+</html>
