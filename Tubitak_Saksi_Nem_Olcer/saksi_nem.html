@@ -1,115 +1,295 @@
-
-
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head runat="server">
-    <title>TOSYA-IOT Toprak Nem Takip</title>
-    <!-- Tarayıcıda MQTT protokolünü kullanabilmek için CDN kütüphanesi -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TÜBİTAK 4006 - Akıllı Saksi Nem Takip Sistemi</title>
+    <!-- Tarayıcıda MQTT için CDN kütüphanesi -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     
     <style>
+        :root {
+            --primary-color: #2ecc71;
+            --bg-color: #eef2f7;
+            --card-bg: #ffffff;
+            --text-color: #2c3e50;
+        }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f4f8;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            color: var(--text-color);
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
-        .iot-card {
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            width: 320px;
+
+        .dashboard {
+            background: var(--card-bg);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
             text-align: center;
-            border-top: 5px solid #2ecc71;
+            padding: 35px;
+            position: relative;
+            overflow: hidden;
+            border-top: 8px solid var(--primary-color);
+            transition: all 0.5s ease;
         }
-        h2 {
-            color: #2c3e50;
-            margin-top: 0;
-            font-size: 24px;
-        }
-        hr {
-            border: 0;
-            height: 1px;
-            background: #e0e0e0;
-            margin: 20px 0;
-        }
-        .data-container {
-            font-size: 40px;
-            font-weight: bold;
-            color: #27ae60;
-            margin: 20px 0;
-        }
-        .status-text {
+
+        /* TÜBİTAK Logolu Başlık Alanı */
+        .tubitak-header {
+            background: #4a148c;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
             font-size: 14px;
-            font-weight: 500;
+            font-weight: bold;
+            letter-spacing: 1px;
+            display: inline-block;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 10px rgba(74, 20, 140, 0.3);
+        }
+
+        h2 {
+            margin: 5px 0;
+            font-size: 26px;
+            color: #1a252f;
+        }
+
+        .sub-title {
+            color: #7f8c8d;
+            margin: 0 0 25px 0;
+            font-size: 15px;
+        }
+
+        /* Janjanlı Dairesel Gösterge Grafiği */
+        .progress-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 25px auto;
+        }
+
+        .progress-svg {
+            transform: rotate(-90deg);
+            width: 200px;
+            height: 200px;
+        }
+
+        .progress-bg {
+            fill: none;
+            stroke: #e6e9ed;
+            stroke-width: 12;
+        }
+
+        .progress-bar {
+            fill: none;
+            stroke: var(--primary-color);
+            stroke-width: 12;
+            stroke-linecap: round;
+            stroke-dasharray: 565.48;
+            stroke-dashoffset: 565.48;
+            transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
+        }
+
+        .progress-text-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .percentage {
+            font-size: 44px;
+            font-weight: 800;
+            color: #1a252f;
+            display: block;
+            transition: color 0.5s ease;
+        }
+
+        /* Dinamik Bitki Emojisi Alanı */
+        #plant-emoji {
+            font-size: 40px;
+            margin-top: -5px;
+            display: block;
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        /* Durum Kartı */
+        .status-badge {
+            background: #f8f9fa;
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 25px;
+            display: inline-block;
+            border: 1px solid #e2e8f0;
+            transition: all 0.5s ease;
+        }
+
+        /* Canlı Bağlantı Bilgisi */
+        .footer-status {
+            background: #f1f2f6;
+            padding: 10px 15px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
             color: #e67e22;
-            transition: color 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #e67e22;
+            border-radius: 50%;
+            display: inline-block;
+            transition: background-color 0.3s ease;
+        }
+
+        .pulse-active {
+            animation: dot-pulse 1.5s infinite;
+        }
+
+        /* Animasyonlar */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes dot-pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(230, 126, 34, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(230, 126, 34, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(230, 126, 34, 0); }
         }
     </style>
 </head>
 <body>
     <form id="form1" runat="server">
-        <div class="iot-card">
-            <h2>TOSYA-IOT Canlı Veri</h2>
-            <p style="color: #7f8c8d; margin: 0; font-size: 14px;">Akıllı Saksi Nem Durumu</p>
-            <hr />
+        <div class="dashboard" id="main-card">
+            <div class="tubitak-header">TÜBİTAK 4006 BİLİM FUARI</div>
+            <h2>TOSYA-IOT Akıllı Saksı</h2>
+            <p class="sub-title">Gerçek Zamanlı Toprak Nem Takip Projesi</p>
             
-            <!-- Canlı Nem Verisi Buraya Yazılacak -->
-            <div class="data-container">
-                %<span id="web_toprak_nem">--</span>
+            <!-- Janjanlı Yuvarlak İlerleme Grafiği -->
+            <div class="progress-container">
+                <svg class="progress-svg">
+                    <circle class="progress-bg" cx="100" cy="100" r="90"></circle>
+                    <circle class="progress-bar" id="circle-bar" cx="100" cy="100" r="90"></circle>
+                </svg>
+                <div class="progress-text-box">
+                    <span class="percentage" id="web_toprak_nem">%--</span>
+                    <span id="plant-emoji">🌱</span>
+                </div>
             </div>
             
-            <hr />
-            <!-- Canlı Bağlantı Durumu -->
-            <div id="baglanti_durumu" class="status-text">Bulut sunucusuna bağlanılıyor...</div>
+            <!-- Bilgilendirici Durum Etiketi -->
+            <div>
+                <div id="durum_etiketi" class="status-badge">Veri bekleniyor...</div>
+            </div>
+            
+            <!-- Alt Canlı Bağlantı Çubuğu -->
+            <div class="footer-status">
+                <span class="pulse-dot pulse-active" id="status-dot"></span>
+                <span id="baglanti_durumu">Sisteme bağlanılıyor...</span>
+            </div>
         </div>
     </form>
 
     <script>
-        // Tarayıcılar güvenli WebSocket (wss) üzerinden 8884 portunu kullanarak HiveMQ'ya bağlanır
+        // WebSocket SSL Protokolü üzerinden HiveMQ Bağlantısı
         const broker = 'wss://broker.hivemq.com:8884/mqtt'; 
         const client = mqtt.connect(broker);
 
         const durumElementi = document.getElementById('baglanti_durumu');
+        const statusDot = document.getElementById('status-dot');
         const nemElementi = document.getElementById('web_toprak_nem');
+        const durumEtiketi = document.getElementById('durum_etiketi');
+        const circleBar = document.getElementById('circle-bar');
+        const plantEmoji = document.getElementById('plant-emoji');
+        const mainCard = document.getElementById('main-card');
 
-        // Broker bağlantısı başarılı olduğunda çalışır
+        // SVG Çevre Hesaplaması (2 * PI * R) -> 2 * 3.14159 * 90 = 565.48
+        const maxOffset = 565.48;
+
+        function setProgress(percent) {
+            const offset = maxOffset - (percent / 100) * maxOffset;
+            circleBar.style.strokeDashoffset = offset;
+        }
+
+        // MQTT Bağlantısı Kurulduğunda
         client.on('connect', function () {
-            durumElementi.innerText = 'Canlı Veri Bağlantısı Aktif';
-            durumElementi.style.color = 'green';
+            durumElementi.innerText = 'Canlı IoT Sistemi Aktif';
+            durumElementi.style.color = '#27ae60';
+            statusDot.style.backgroundColor = '#27ae60';
+            statusDot.style.animation = 'dot-pulse 1.5s infinite';
+            // Yeşil renge duyarlı pulse efekti için gölge ayarı
+            statusDot.style.setProperty('--shadow-color', 'rgba(39, 174, 96, 0.7)');
             
-            // ESP8266'nın ilk başta hazırladığımız MQTT konusuna (topic) abone oluyoruz
             client.subscribe('burak37/toprak_nem');
         });
 
-        // Yeni veri geldiğinde çalışır
+        // ESP8266'dan Yeni Veri Düştüğünde
         client.on('message', function (topic, message) {
             const veri = message.toString();
 
             if (topic === 'burak37/toprak_nem') {
-                // Gelen veriyi tam sayı formatında ekrana basıyoruz
-                nemElementi.innerText = parseInt(veri);
-                
-                // Küçük bir görsel zeka ekleyelim: Nem durumuna göre kartın rengiyle oynayabiliriz
                 const nemDegeri = parseInt(veri);
+                
+                // Değerleri Ekrana Yaz ve Grafiği Oynat
+                nemElementi.innerText = '%' + nemDegeri;
+                setProgress(nemDegeri);
+                
+                // Duruma Göre Renkleri ve Emojileri Janjanlı Şekilde Değiştir
                 if(nemDegeri < 30) {
-                    nemElementi.style.color = '#e74c3c'; // Çok kuruysa Kırmızı
-                } else if(nemDegeri < 70) {
-                    nemElementi.style.color = '#27ae60'; // İdealse Yeşil
-                } else {
-                    nemElementi.style.color = '#2980b9'; // Çok ıslaksa Mavi
+                    // KURU DURUMU
+                    nemElementi.style.color = '#e74c3c';
+                    durumEtiketi.innerText = 'DURUM: ÇOK KURU! 💧';
+                    durumEtiketi.style.color = '#e74c3c';
+                    durumEtiketi.style.backgroundColor = '#fdf2f2';
+                    mainCard.style.borderTopColor = '#e74c3c';
+                    circleBar.style.stroke = '#e74c3c';
+                    plantEmoji.innerText = '🥀';
+                } 
+                else if(nemDegeri < 70) {
+                    // İDEAL DURUM
+                    nemElementi.style.color = '#27ae60';
+                    durumEtiketi.innerText = 'DURUM: İDEAL MÜKEMMEL  ';
+                    durumEtiketi.style.color = '#27ae60';
+                    durumEtiketi.style.backgroundColor = '#f4fbf7';
+                    mainCard.style.borderTopColor = '#2ecc71';
+                    circleBar.style.stroke = '#27ae60';
+                    plantEmoji.innerText = '🌻';
+                } 
+                else {
+                    // ÇOK ISLAK DURUMU
+                    nemElementi.style.color = '#2980b9';
+                    durumEtiketi.innerText = 'DURUM: FAZLA ISLAK / ÇAMUR 🌊';
+                    durumEtiketi.style.color = '#2980b9';
+                    durumEtiketi.style.backgroundColor = '#f2f7fa';
+                    mainCard.style.borderTopColor = '#2980b9';
+                    circleBar.style.stroke = '#2980b9';
+                    plantEmoji.innerText = '🪴';
                 }
             }
         });
 
-        // Bağlantı hatası durumunda çalışır
+        // Bağlantı Koptuğunda veya Hata Oluştuğunda
         client.on('error', function (err) {
-            durumElementi.innerText = 'Bağlantı Hatası!';
-            durumElementi.style.color = 'red';
+            durumElementi.innerText = 'Bağlantı Kesildi!';
+            durumElementi.style.color = '#e74c3c';
+            statusDot.style.backgroundColor = '#e74c3c';
             console.error(err);
         });
     </script>

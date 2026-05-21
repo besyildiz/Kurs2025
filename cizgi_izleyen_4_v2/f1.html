@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İstanbul Park - Otonom Yarış Kontrol Merkezi</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --f1-red: #ff1801;
+            --bg-dark: #0b0b10;
+            --card-bg: rgba(31, 31, 42, 0.65);
+            --neon-green: #00ff66;
+            --neon-blue: #00e5ff;
+            --neon-yellow: #ffea00;
+            --text-light: #f4f4f5;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(225, 6, 0, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(0, 229, 255, 0.08) 0px, transparent 50%);
+            color: var(--text-light);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 25px;
+            overflow-x: hidden;
+        }
+
+        /* Üst Menü / Header */
+        header {
+            border-bottom: 2px solid rgba(255, 24, 1, 0.3);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(21, 21, 30, 0.8);
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            backdrop-filter: blur(4px);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 26px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            background: linear-gradient(90deg, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .live-badge {
+            background: linear-gradient(90deg, var(--f1-red), #b30500);
+            color: white;
+            padding: 6px 14px;
+            font-weight: 800;
+            border-radius: 20px;
+            font-size: 13px;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px var(--f1-red);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: white;
+            border-radius: 50%;
+            animation: blink 1.2s infinite;
+        }
+
+        @keyframes blink {
+            0% { opacity: 0.2; }
+            50% { opacity: 1; }
+            100% { opacity: 0.2; }
+        }
+
+        /* Dashboard Düzeni */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1.8fr;
+            gap: 25px;
+        }
+
+        .left-column, .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: #3a3a4a;
+        }
+
+        .card.accent-red::before { background: var(--f1-red); }
+        .card.accent-green::before { background: var(--neon-green); }
+        .card.accent-blue::before { background: var(--neon-blue); }
+
+        h2 {
+            margin-top: 0;
+            font-size: 14px;
+            text-transform: uppercase;
+            color: #9ca3af;
+            letter-spacing: 1px;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* F1 LED RPM Göstergesi */
+        .rpm-led-strip {
+            display: flex;
+            gap: 6px;
+            background: #09090d;
+            padding: 8px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .led {
+            flex: 1;
+            height: 12px;
+            background: #222;
+            border-radius: 3px;
+            transition: background 0.1s ease;
+        }
+
+        /* Dijital Sayıcı Kutuları */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .stat-box {
+            background: rgba(10, 10, 15, 0.6);
+            padding: 14px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.02);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #6b7280;
+            margin-bottom: 5px;
+        }
+
+        .stat-val {
+            font-size: 26px;
+            font-weight: 800;
+            font-family: monospace;
+        }
+
+        /* Çizgi Pozisyonu İllüstrasyonu */
+        .track-simulator {
+            height: 40px;
+            background: #111;
+            border-radius: 8px;
+            position: relative;
+            margin-top: 15px;
+            border: 1px dashed #333;
+        }
+        .center-line {
+            position: absolute;
+            left: 50%; top: 0; width: 2px; height: 100%;
+            background: rgba(255,255,255,0.2);
+        }
+        .car-pointer {
+            position: absolute;
+            top: 5px; left: 50%; width: 30px; height: 30px;
+            background: var(--f1-red);
+            border-radius: 6px;
+            transform: translateX(-50%);
+            transition: left 0.15s ease;
+            box-shadow: 0 0 10px var(--f1-red);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: bold; color: white;
+        }
+
+        /* İstanbul Park SVG Haritası */
+        .map-container {
+            text-align: center;
+            padding: 10px;
+            background: #0f0f14;
+            border-radius: 12px;
+        }
+        .f1-map {
+            width: 100%;
+            height: 200px;
+            fill: none;
+            stroke: #333;
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .f1-track-active {
+            stroke: var(--neon-blue);
+            stroke-width: 8;
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 0;
+        }
+
+        /* Terminal Penceresi */
+        .terminal {
+            background: #040406;
+            font-family: 'Courier New', monospace;
+            padding: 12px;
+            border-radius: 10px;
+            height: 140px;
+            overflow-y: hidden;
+            font-size: 11px;
+            color: #38bdf8;
+            border: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Intercity İstanbul Park — Race Control</h1>
+            <small style="color: #6b7280; font-weight: 500;">TÜBİTAK 4006 Bilim Fuarı Otonom Teknolojiler Projesi</small>
+        </div>
+        <div class="live-badge"><div class="dot"></div>TELEMETRİ LIVE</div>
+    </header>
+
+    <div class="dashboard-grid">
+        
+        <div class="left-column">
+            <div class="card accent-blue">
+                <h2>Pist Analizi & Telemetri Konumu</h2>
+                <div class="map-container">
+                    <svg class="f1-map" viewBox="0 0 400 200">
+                        <path d="M 50,150 L 80,60 Q 130,20 200,60 T 350,100 Q 380,150 300,170 K L 150,170 Z" class="f1-track-active"/>
+                    </svg>
+                </div>
+                <div class="stats-grid" style="margin-top: 15px; grid-template-columns: 1fr;">
+                    <div class="stat-box" style="border-left: 3px solid var(--neon-blue);">
+                        <div class="stat-label">Anlık Sektör / Konum Durumu</div>
+                        <div id="txtSector" class="stat-val" style="color: var(--neon-blue); font-size: 18px;">SEKTÖR 2 (VİRAJ 8)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Yarış Kontrol Sistem Veri Akışı</h2>
+                <div id="terminalLog" class="terminal"></div>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="card accent-red">
+                <h2>Hız Göstergesi & Motor Gücü Girişi</h2>
+                <div id="speedLabel" style="font-size: 13px; font-weight: bold; margin-bottom: 5px;">HIZ: 0 PWM</div>
+                <div class="rpm-led-strip" id="ledStrip">
+                    <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
+                    <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
+                    <div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div><div class="led"></div>
+                </div>
+
+                <div class="track-simulator">
+                    <div class="center-line"></div>
+                    <div id="carPointer" class="car-pointer">AI</div>
+                </div>
+                <div style="text-align: center; font-size: 11px; color:#6b7280; margin-top:5px;">Yapay Zeka Şerit Ortalama Simülatörü</div>
+            </div>
+
+            <div class="card accent-green">
+                <h2>Algoritma Veri Odası (PID Kontrol Odası)</h2>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-label" style="color: #ef4444;">Orantısal (Kp)</div>
+                        <div class="stat-val" style="color: #ef4444;">0.22</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label" style="color: #eab308;">Türevsel (Kd)</div>
+                        <div class="stat-val" style="color: #eab308;">0.50</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label" style="color: var(--neon-green);">Anlık Hata</div>
+                        <div id="txtHata" class="stat-val" style="color: var(--neon-green);">0</div>
+                    </div>
+                </div>
+                <div class="stats-grid" style="margin-top: 15px;">
+                    <div class="stat-box">
+                        <div class="stat-label">Sensör Okuma</div>
+                        <div id="txtPozisyon" class="stat-val" style="color: #fff; font-size: 18px;">3500</div>
+                    </div>
+                    <div class="stat-box" style="grid-column: span 2;">
+                        <div class="stat-label">Direksiyon Durumu</div>
+                        <div id="txtDurum" class="stat-val" style="color: var(--neon-yellow); font-size: 18px;">TAM MERKEZ</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Hata Sönümleme ve Çizgi Takip Dalga Analizi</h2>
+                <canvas id="pidChart" style="width:100%; height:120px;"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- GRAFİK AYARLARI ---
+        const ctx = document.getElementById('pidChart').getContext('2d');
+        const pidChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(25).fill(''),
+                datasets: [{
+                    data: Array(25).fill(0),
+                    borderColor: '#00ff66',
+                    borderWidth: 2.5,
+                    pointRadius: 0,
+                    fill: true,
+                    backgroundColor: 'rgba(0, 255, 102, 0.05)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: { min: -2500, max: 2500, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7280' } },
+                    x: { grid: { display: false } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // --- İLLÜZYON MOTORU (YARIŞ SİMÜLASYONU) ---
+        let t = 0;
+        const leds = document.querySelectorAll('.led');
+        const sectors = ["START DÜZLÜĞÜ", "VİRAJ 1 (İlk Dönemeç)", "SEKTÖR 1 CORNER", "MEŞHUR VİRAJ 8 (Apex)", "ARKA DÜZLÜK (Hızlanma)", "PİT GİRİŞİ"];
+
+        setInterval(() => {
+            t += 0.08;
+
+            // Yapay F1 hatası oluşturma
+            let errorWave = Math.sin(t) * 1900 + Math.cos(t * 2.5) * 350;
+            if(Math.sin(t/3) > 0.6) { errorWave *= 0.15; } // Düzlük efekti
+
+            let position = Math.round(3500 - errorWave);
+            let error = 3500 - position;
+
+            // Durumlar ve Hız Simülasyonu
+            let durum = "TAM MERKEZ";
+            let currentSpeed = 95; 
+
+            if (position < 1000) { durum = "EN SOLDA (Keskin Sol)"; currentSpeed = 130; }
+            else if (position >= 1000 && position < 3300) { durum = "MERKEZ SOL"; currentSpeed = Math.round(90 + (error * 0.015)); }
+            else if (position > 3700 && position <= 6000) { durum = "MERKEZ SAG"; currentSpeed = Math.round(90 - (error * 0.015)); }
+            else if (position > 6000) { durum = "EN SAGDA (Keskin Sağ)"; currentSpeed = 130; }
+
+            // Arayüz Değerleri Güncelleme
+            document.getElementById('txtPozisyon').innerText = position;
+            document.getElementById('txtHata').innerText = error;
+            document.getElementById('txtDurum').innerText = durum;
+            document.getElementById('speedLabel').innerText = `MOTOR SÜRÜCÜ GÜCÜ: ${currentSpeed} PWM`;
+
+            // Şerit İllüstrasyonu Güncelleme (0 ile 7000 arasını % ye vuruyoruz)
+            let pointerPercent = (position / 7000) * 100;
+            document.getElementById('carPointer').style.left = pointerPercent + '%';
+
+            // Haritadaki Sektör Değişim İllüstrasyonu
+            let sectorIndex = Math.floor((t % (sectors.length * 2)) / 2);
+            document.getElementById('txtSector').innerText = sectors[sectorIndex] || sectors[0];
+
+            // F1 Direksiyon LED Bar Güncellemesi
+            let numLedsToLight = Math.round((currentSpeed / 140) * leds.length);
+            leds.forEach((led, idx) => {
+                if (idx < numLedsToLight) {
+                    if (idx < 5) led.style.background = 'var(--neon-green)';
+                    else if (idx < 10) led.style.background = 'var(--neon-yellow)';
+                    else led.style.background = 'var(--f1-red)';
+                    led.style.boxShadow = "0 0 8px " + led.style.background;
+                } else {
+                    led.style.background = '#222';
+                    led.style.boxShadow = 'none';
+                }
+            });
+
+            // Grafik Güncelleme
+            pidChart.data.datasets[0].data.shift();
+            pidChart.data.datasets[0].data.push(error);
+            pidChart.update('none');
+
+            // Yarış Kontrol Terminali Log Güncelleme
+            const term = document.getElementById('terminalLog');
+            let timestamp = new Date().toLocaleTimeString();
+            term.innerHTML += `[${timestamp}] TELEMETRY -> Poz:${position} | Hata:${error} | Şerit:${durum.split(' ')[0]}<br>`;
+            term.scrollTop = term.scrollHeight;
+
+            if(term.innerHTML.split('<br>').length > 7) {
+                term.innerHTML = term.innerHTML.split('<br>').slice(1).join('<br>');
+            }
+
+        }, 130);
+    </script>
+</body>
+</html>

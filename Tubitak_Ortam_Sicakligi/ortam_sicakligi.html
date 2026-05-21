@@ -1,45 +1,232 @@
-<html><head>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
     <meta charset="utf-8" />
-    <title>TOSYA-IOT Panel</title>
-</head><body>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
-
-<div style="font-family: Arial; padding: 20px; background: #f4f4f4; border-radius: 8px; width: 300px;">
-    <h2>TOSYA-IOT Canlı Veri</h2>
-    <hr />
-    <p style="font-size: 20px;"><strong>Sıcaklık:</strong> <span id="web_sicaklik">Yükleniyor...</span> °C</p>
-    <p style="font-size: 20px;"><strong>Nem:</strong> %<span id="web_nem">Yükleniyor...</span></p>
-    <small style="color: green;" id="baglanti_durumu">Sunucuya bağlanılıyor...</small>
-</div>
-
-<script>
-    // Tarayıcılar için WebSocket SSL portu (8884) kullanılır
-    const broker = 'wss://broker.hivemq.com:8884/mqtt'; 
-    const client = mqtt.connect(broker);
-
-    client.on('connect', function () {
-        document.getElementById('baglanti_durumu').innerText = 'Canlı Veri Bağlantısı Aktif';
-        document.getElementById('baglanti_durumu').style.color = 'green';
-        
-        // ESP8266'nın yayın yaptığı konulara abone oluyoruz
-        client.subscribe('burak37/sicaklik');
-        client.subscribe('burak37/nem');
-    });
-
-    client.on('message', function (topic, message) {
-        // Gelen veriyi string formatına çeviriyoruz
-        const veri = message.toString();
-
-        if (topic === 'burak37/sicaklik') {
-            document.getElementById('web_sicaklik').innerText = parseFloat(veri).toFixed(1);
-        } else if (topic === 'burak37/nem') {
-            document.getElementById('web_nem').innerText = parseInt(veri);
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TOSYA-IOT | TÜBİTAK 4006 NEO</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    
+    <style>
+        /* --- Hareketli Janjanlı Arka Plan --- */
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
-    });
 
-    client.on('error', function (err) {
-        document.getElementById('baglanti_durumu').innerText = 'Bağlantı Hatası!';
-        document.getElementById('baglanti_durumu').style.color = 'red';
-        console.log(err);
-    });
-</script> </body> </html>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* --- Glassmorphism (Cam) Kart Tasarımı --- */
+        .iot-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            width: 380px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .iot-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        h2 {
+            color: #ffffff;
+            margin: 0 0 8px 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .sub-title {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 15px;
+            margin-bottom: 25px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+
+        .divider {
+            border: 0;
+            height: 2px;
+            background: linear-gradient(to right, rgba(255,255,255,0), rgba(255,255,255,0.5), rgba(255,255,255,0));
+            margin-bottom: 25px;
+        }
+
+        /* --- Veri Satırları --- */
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 18px 25px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        .data-row:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.03);
+        }
+
+        .data-label {
+            font-size: 17px;
+            color: #ffffff;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .data-icon {
+            font-size: 1.3em;
+        }
+
+        .data-value {
+            font-size: 26px;
+            color: #ffffff;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+            transition: all 0.3s ease;
+        }
+
+        .data-value.updated {
+            color: #23d5ab;
+            text-shadow: 0 0 15px rgba(35,213,171,0.8);
+        }
+
+        /* --- Durum Kutusu --- */
+        .status-box {
+            margin-top: 25px;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(229, 62, 62, 0.2); /* Varsayılan: Kırmızı */
+            color: #fc8181;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(229, 62, 62, 0.3);
+            transition: all 0.4s ease;
+            box-shadow: 0 0 10px rgba(229, 62, 62, 0.3);
+        }
+
+        /* Bağlantı kurulduğunda devreye girecek yeşil stil */
+        .status-box.status-online {
+            background: rgba(35, 213, 171, 0.2) !important;
+            color: #81e6d9 !important;
+            border: 1px solid rgba(35, 213, 171, 0.3) !important;
+            box-shadow: 0 0 15px rgba(35, 213, 171, 0.5) !important;
+        }
+
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            background-color: currentColor;
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700;800&display=swap');
+    </style>
+</head>
+<body>
+
+    <div class="iot-card">
+        <h2>TOSYA-IOT Canlı Veri</h2>
+        <div class="sub-title">TÜBİTAK 4006 Bilim Fuarı Projesi</div>
+        <div class="divider"></div>
+        
+        <div class="data-row">
+            <span class="data-label"><span class="data-icon">🌡️</span> Sıcaklık:</span>
+            <span class="data-value" id="val_sicaklik"><span id="web_sicaklik">--</span> °C</span>
+        </div>
+        
+        <div class="data-row">
+            <span class="data-label"><span class="data-icon">💧</span> Nem Durumu:</span>
+            <span class="data-value" id="val_nem">%<span id="web_nem">--</span></span>
+        </div>
+        
+        <div id="baglanti_durumu" class="status-box">
+            <span class="status-dot"></span>
+            <span id="status_text">Sunucuya bağlanılıyor...</span>
+        </div>
+    </div>
+
+    <script>
+        const broker = 'wss://broker.hivemq.com:8884/mqtt'; 
+        const client = mqtt.connect(broker);
+
+        const durumKutusu = document.getElementById('baglanti_durumu');
+        const durumMetni = document.getElementById('status_text');
+        const sicaklikDeger = document.getElementById('val_sicaklik');
+        const nemDeger = document.getElementById('val_nem');
+
+        function animateValue(element) {
+            element.classList.add('updated');
+            setTimeout(() => {
+                element.classList.remove('updated');
+            }, 500);
+        }
+
+        // --- HATA BURADAYDI, DÜZELTİLDİ ---
+        client.on('connect', function () {
+            durumMetni.innerText = 'Canlı Veri Bağlantısı Aktif';
+            durumKutusu.classList.add('status-online'); // Yeşil sınıfa geçiriyoruz
+            
+            client.subscribe('burak37/sicaklik');
+            client.subscribe('burak37/nem');
+        });
+
+        client.on('message', function (topic, message) {
+            const veri = message.toString();
+
+            if (topic === 'burak37/sicaklik') {
+                document.getElementById('web_sicaklik').innerText = parseFloat(veri).toFixed(1);
+                animateValue(sicaklikDeger);
+            } else if (topic === 'burak37/nem') {
+                document.getElementById('web_nem').innerText = parseInt(veri);
+                animateValue(nemDeger);
+            }
+        });
+
+        client.on('error', function (err) {
+            durumMetni.innerText = 'Bağlantı Hatası!';
+            durumKutusu.classList.remove('status-online');
+            console.log(err);
+        });
+    </script>
+
+</body>
+</html>
